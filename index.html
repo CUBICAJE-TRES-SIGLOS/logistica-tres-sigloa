@@ -1737,18 +1737,22 @@
 
 				.logistica-table th,
 				.logistica-table td {
-					padding: 1px 3px;
-					line-height: 1.1;
+					padding: 4px 5px;
+					line-height: 1.25;
 					white-space: normal;
 					word-break: break-word;
 					overflow-wrap: anywhere;
 					border-bottom: 1px solid #94a3b8;
-					vertical-align: middle;
+					vertical-align: top;
+				}
+
+				.logistica-table tbody td {
+					min-height: 32px;
 				}
 
 				.logistica-table tbody tr {
 					height: auto !important;
-					max-height: 22px;
+					max-height: none !important;
 				}
 
 				.logistica-table thead th {
@@ -1836,6 +1840,15 @@
 					display: none;
 				}
 
+				.logistica-table .col-unidad input,
+				.logistica-table .col-unidad textarea,
+				.logistica-table .col-acompanante input,
+				.logistica-table .col-acompanante textarea,
+				.logistica-table .col-quienCarga input,
+				.logistica-table .col-quienCarga textarea {
+					display: none;
+				}
+
 				.print-only {
 					display: block;
 					white-space: normal;
@@ -1877,14 +1890,19 @@
 					font-size: 12.5px;
 					line-height: 1;
 					height: auto !important;
-					
+					width: 100%;
+					white-space: normal !important;
+					overflow: visible !important;
+					text-overflow: clip !important;
+					word-break: break-word !important;
+					overflow-wrap: anywhere !important;
+				}
 
 				.logistica-table .col-ordenCarga input,
 				.logistica-table .col-cantidadAuto input,
 				.logistica-table .col-cantidadCamion input,
 				.logistica-table .col-otras input {
 					text-align: center;
-				}width: 100%;
 				}
 
 				.logistica-table textarea {
@@ -2619,6 +2637,8 @@
 				"almacen",
 				"cantidad",
 				"unidad",
+				"acompanante",
+				"quienCarga",
 			];
 			const pdfColumnKeys = new Set(pdfColumnKeysArray);
 
@@ -5146,8 +5166,9 @@
 							const input = isStacked
 								? renderStackedInputs(cell.value, cell.list || "", columnKey)
 								: renderInput(cell.value, cell.list || "");
+							const shouldPrintAsText = ["economico", "unidad", "acompanante", "quienCarga"].includes(columnKey);
 							const printOnly =
-								columnKey === "economico"
+								shouldPrintAsText
 									? `<div class="print-only">${escapeText(cell.value)}</div>`
 									: "";
 							return `<td${hideAttr} class="col-${columnKey}${printHideClass}${hiddenClass}">${input}${printOnly}</td>`;
@@ -5657,6 +5678,29 @@
 				});
 			};
 
+			const forcePdfColumnsForPrint = () => {
+				pdfColumnKeysArray.forEach((key) => {
+					document
+						.querySelectorAll(`.logistica-table .col-${key}`)
+						.forEach((cell) => {
+							if (!cell.classList.contains("hidden-column")) return;
+							cell.dataset.printWasHiddenColumn = "true";
+							cell.classList.remove("hidden-column");
+						});
+				});
+			};
+
+			const restorePdfColumnsAfterPrint = () => {
+				document
+					.querySelectorAll(
+						'.logistica-table [data-print-was-hidden-column="true"]'
+					)
+					.forEach((cell) => {
+						cell.classList.add("hidden-column");
+						delete cell.dataset.printWasHiddenColumn;
+					});
+			};
+
 			const applyDestinoPrintTruncate = () => {
 				getLogisticaBodies().forEach((body) => {
 					body.querySelectorAll(".destino-compact").forEach((wrapper) => {
@@ -5884,6 +5928,7 @@
 				setTimeout(() => {
 					applyDestinoPrintTruncate();
 					applyLogisticaPrintCommentVisibility();
+					forcePdfColumnsForPrint();
 					window.print();
 				}, 100);
 			});
@@ -5891,10 +5936,12 @@
 			window.addEventListener("beforeprint", () => {
 				applyDestinoPrintTruncate();
 				applyLogisticaPrintCommentVisibility();
+				forcePdfColumnsForPrint();
 			});
 
 			window.addEventListener("afterprint", () => {
 				restoreDestinoAfterPrint();
+				restorePdfColumnsAfterPrint();
 			});
 
 			const formatUnitLabel = (unit) => {
